@@ -54,6 +54,10 @@
         state: directory
         path: "{{ elastic_home }}"
       tags: elastic
+    - name: Update repos and install unzip
+      apt:
+        name: unzip
+        update_cache: yes
     - name: Extract Elasticsearch in the installation directory
       become: true
       unarchive:
@@ -70,3 +74,40 @@
         src: templates/elk.sh.j2
         dest: /etc/profile.d/elk.sh
       tags: elastic
+- name: Install Kibana
+  hosts: elasticsearch
+  tasks:
+    - name: Download tar.gz Kibana from remote URL
+      get_url:
+        url: "https://artifacts.elastic.co/downloads/kibana/kibana-{{ kibana_version }}-linux-x86_64.tar.gz"
+        dest: "/tmp/kibana-{{ kibana_version }}-linux-x86_64.tar.gz"
+        mode: 0755
+        timeout: 60
+        force: true
+        validate_certs: false
+      tags: kibana
+    - name: Create directory for Kibana
+      file:
+        state: directory
+        path: "{{ KIBANA_HOME }}"
+      tags: kibana
+    - name: Extract Kibana in the installation directory
+      become: true
+      unarchive:
+        remote_src: yes
+        src: "/tmp/kibana.tar.gz"
+        dest: "/opt/kibana/7.16.2"
+        extra_opts: [--strip-components=1]
+        creates: "{{ KIBANA_HOME }}bin/kibana"
+      tags: kibana
+    - name: Set enviroment Kibana
+      template:
+        src: templates/kbn.sh.j2
+        dest: /etc/profile.d/kbn.sh
+    - name: Create file kibana.sh and start kibana
+      ansible.builtin.copy:
+        content: "/opt/kibana/7.16.2/bin/kibana --allow-root"
+        dest: "{{ KIBANA_HOME }}kibana.sh"
+    - name: Start Kibana
+      shell: /opt/kibana/7.16.2/kibana.sh &
+      changed_when: true
